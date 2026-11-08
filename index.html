@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#8fc7ff">
+<title>Кубики — моя песочница</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%238fc7ff'/%3E%3Crect x='20' y='44' width='26' height='26' fill='%235aa02c'/%3E%3Crect x='50' y='32' width='26' height='26' fill='%238a5a2b'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+
+<!-- прицел -->
+<div class="crosshair" id="crosshair" aria-hidden="true"></div>
+
+<!-- джойстик -->
+<div class="stick" id="stick" aria-hidden="true">
+  <div class="stick-knob" id="stick-knob"></div>
+</div>
+
+<!-- верх -->
+<div class="topbar">
+  <button class="round" id="btn-undo" type="button" aria-label="Отменить">
+    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7H14a5 5 0 0 1 0 10h-3"/><path d="M9 3 5 7l4 4"/></svg>
+  </button>
+  <button class="round" id="btn-sound" type="button" aria-label="Звук">
+    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path class="wave" d="M17 8.5a5 5 0 0 1 0 7"/></svg>
+  </button>
+  <button class="round" id="btn-new" type="button" aria-label="Новый мир">
+    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg>
+  </button>
+</div>
+
+<!-- режим и прыжок -->
+<div class="actions">
+  <button class="mode" id="btn-mode" type="button" aria-label="Режим">
+    <span class="mode-icon build">
+      <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l7.5 4.2v8.6L12 20.5l-7.5-4.2V7.7z"/><path d="M12 12.2l7.5-4.3M12 12.2L4.5 7.9M12 12.2v8.3"/></svg>
+    </span>
+    <span class="mode-icon dig">
+      <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l6-6"/><path d="M10 14l4-8 6 3-4 8z"/></svg>
+    </span>
+  </button>
+  <button class="jump" id="btn-jump" type="button" aria-label="Прыжок">
+    <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V6"/><path d="M6 11l6-6 6 6"/></svg>
+  </button>
+</div>
+
+<!-- инвентарь -->
+<div class="hotbar" id="hotbar" role="group" aria-label="Блоки"></div>
+
+<div class="stars" aria-label="Звёзды">
+  <span class="star-icon">★</span>
+  <span id="starCount">0</span>
+</div>
+
+<div class="award" id="award" aria-hidden="true">
+  <div class="award-star">★</div>
+  <p class="award-text">Молодец!</p>
+</div>
+
+<div class="hint" id="hint">Води пальцем слева — идти, справа — смотреть. Тапни по кубику</div>
+
+<div class="confirm" id="confirm">
+  <div class="confirm-card">
+    <p>Сделать новый мир?<br><span>Старый пропадёт</span></p>
+    <div class="confirm-actions">
+      <button class="round small" id="confirm-no" type="button" aria-label="Нет">✕</button>
+      <button class="round small ok" id="confirm-yes" type="button" aria-label="Да">✓</button>
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+<script type="module" src="game.js"></script>
+</body>
+</html>
