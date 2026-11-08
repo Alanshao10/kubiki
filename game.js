@@ -135,7 +135,7 @@ function buildAtlas() {
 
 // ------------------------------------------------------------------ мир
 
-const BOUND = { x: 22, y: 20, z: 22 };
+const BOUND = { x: 30, y: 20, z: 30 };
 const world = new Map();
 
 const key = (x, y, z) => `${x},${y},${z}`;
@@ -178,12 +178,161 @@ function plantTree(x, z) {
   }
 }
 
+
+// ------------------------------------------------------------------ город
+
+function fillArea(x1, y1, z1, x2, y2, z2, type) {
+  for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) {
+    for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
+      for (let z = Math.min(z1, z2); z <= Math.max(z1, z2); z++) setBlock(x, y, z, type);
+    }
+  }
+}
+
+function clearArea(x1, y1, z1, x2, y2, z2) {
+  for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) {
+    for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
+      for (let z = Math.min(z1, z2); z <= Math.max(z1, z2); z++) delBlock(x, y, z);
+    }
+  }
+}
+
+function flattenArea(x1, z1, x2, z2, level) {
+  for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) {
+    for (let z = Math.min(z1, z2); z <= Math.max(z1, z2); z++) {
+      clearArea(x, level + 1, z, x, BOUND.y, z);
+      setBlock(x, level, z, GRASS);
+      setBlock(x, level - 1, z, DIRT);
+      setBlock(x, level - 2, z, STONE);
+    }
+  }
+}
+
+function buildHouse(x, z, w, d, h, level, wall, roof) {
+  fillArea(x, level, z, x + w - 1, level, z + d - 1, PLANKS);
+
+  for (let y = 1; y <= h; y++) {
+    for (let i = 0; i < w; i++) {
+      for (let j = 0; j < d; j++) {
+        const edge = i === 0 || j === 0 || i === w - 1 || j === d - 1;
+        if (edge) setBlock(x + i, level + y, z + j, wall);
+      }
+    }
+  }
+
+  // дверной проём
+  clearArea(x + Math.floor(w / 2), level + 1, z + d - 1, x + Math.floor(w / 2), level + 2, z + d - 1);
+
+  // окна
+  for (let i = 2; i < w - 2; i += 3) {
+    clearArea(x + i, level + 2, z, x + i, level + 2, z);
+    clearArea(x + i, level + 2, z + d - 1, x + i, level + 2, z + d - 1);
+  }
+
+  // крыша
+  fillArea(x - 1, level + h + 1, z - 1, x + w, level + h + 1, z + d, roof);
+  fillArea(x, level + h + 2, z, x + w - 1, level + h + 2, z + d - 1, roof);
+}
+
+function buildHall(x, z, w, d, h, level) {
+  flattenArea(x - 2, z - 2, x + w + 1, z + d + 1, level);
+  fillArea(x, level, z, x + w - 1, level, z + d - 1, STONE);
+
+  // стены с колоннами и окнами
+  for (let y = 1; y <= h; y++) {
+    for (let i = 0; i < w; i++) {
+      for (let j = 0; j < d; j++) {
+        const edge = i === 0 || j === 0 || i === w - 1 || j === d - 1;
+        if (!edge) continue;
+        const pillar = i % 3 === 0 && j % 3 === 0;
+        if (pillar || y === h) {
+          setBlock(x + i, level + y, z + j, STONE);
+        } else if (y === 2 || y === 3) {
+          setBlock(x + i, level + y, z + j, BRICK);
+        } else {
+          setBlock(x + i, level + y, z + j, STONE);
+        }
+      }
+    }
+  }
+
+  // окна над дверью и по бокам
+  for (let i = 1; i < w - 1; i++) {
+    if (i % 3 === 0) continue;
+    clearArea(x + i, level + 4, z, x + i, level + 4, z);
+    clearArea(x + i, level + 4, z + d - 1, x + i, level + 4, z + d - 1);
+  }
+
+  // широкий вход
+  const doorX = Math.floor(w / 2);
+  clearArea(x + doorX - 1, level + 1, z + d - 1, x + doorX + 1, level + 3, z + d - 1);
+
+  // второй этаж с отверстием под лестницу
+  fillArea(x + 1, level + 5, z + 1, x + w - 2, level + 5, z + d - 2, PLANKS);
+  clearArea(x + 2, level + 5, z + 2, x + 5, level + 5, z + 5);
+
+  // лестница на второй этаж
+  for (let s = 0; s < 5; s++) {
+    setBlock(x + 2 + s, level + 1 + s, z + 2, STONE);
+    setBlock(x + 2 + s, level + 1 + s, z + 3, STONE);
+  }
+
+  // крыша
+  fillArea(x - 1, level + h + 1, z - 1, x + w, level + h + 1, z + d, BRICK);
+  fillArea(x + 1, level + h + 2, z + 1, x + w - 2, level + h + 2, z + d - 2, BRICK);
+  fillArea(x + 3, level + h + 3, z + 3, x + w - 4, level + h + 3, z + d - 4, BRICK);
+}
+
+function buildLamp(x, z, level) {
+  setBlock(x, level + 1, z, WOOD);
+  setBlock(x, level + 2, z, WOOD);
+  setBlock(x, level + 3, z, TORCH);
+}
+
+function buildFountain(x, z, level) {
+  for (let dx = -3; dx <= 3; dx++) {
+    for (let dz = -3; dz <= 3; dz++) {
+      const d = Math.hypot(dx, dz);
+      if (d < 1.6) setBlock(x + dx, level, z + dz, WATER);
+      else if (d < 3.2) setBlock(x + dx, level, z + dz, STONE);
+      if (d >= 2.4 && d < 3.2) setBlock(x + dx, level + 1, z + dz, STONE);
+    }
+  }
+}
+
+function buildCity() {
+  const level = 4;
+
+  // площадь и улицы
+  flattenArea(-16, -8, 16, 16, level);
+  fillArea(-2, level, -8, 2, level, 16, STONE);
+
+  // главное здание — в него можно зайти
+  buildHall(-13, -6, 12, 9, 7, level);
+
+  // дома
+  buildHouse(4, -6, 6, 5, 3, level, BRICK, BRICK);
+  buildHouse(12, -6, 5, 5, 3, level, WOOD, BRICK);
+  buildHouse(4, 4, 5, 5, 3, level, PLANKS, BRICK);
+  buildHouse(12, 4, 6, 5, 4, level, STONE, BRICK);
+  buildHouse(-6, 6, 5, 5, 3, level, BRICK, PLANKS);
+
+  // фонтан в центре
+  buildFountain(9, 11, level);
+
+  // фонари вдоль улицы
+  for (let z = -6; z <= 14; z += 5) {
+    buildLamp(-3, z, level);
+    buildLamp(3, z, level);
+  }
+}
+
 function generateWorld() {
   world.clear();
 
   // рельеф
-  for (let x = -18; x <= 18; x++) {
-    for (let z = -18; z <= 18; z++) {
+  for (let x = -26; x <= 26; x++) {
+    for (let z = -26; z <= 26; z++) {
       const h = terrainHeight(x, z);
       setBlock(x, h, z, GRASS);
       for (let y = h - 1; y >= Math.max(0, h - 3); y--) setBlock(x, y, z, y === h - 1 ? DIRT : STONE);
@@ -234,8 +383,11 @@ function generateWorld() {
     for (let z = hz + 1; z <= hz + 3; z++) setBlock(x, hy + 5, z, BRICK);
   }
 
+  buildCity();
+
   // деревья
-  const spots = [[6, 6], [-3, -8], [9, 9], [-12, -5], [3, -13], [13, 3], [-6, -14], [-15, 8]];
+  const spots = [[20, -12], [-20, 12], [18, 18], [-22, -18], [22, 4], [-8, 20], [16, -20],
+    [-18, -2], [6, -14], [-8, 24], [24, -2], [-24, 6], [12, 20], [-20, 22]];
   for (const [x, z] of spots) plantTree(x, z);
 
   // дорожка от дома
@@ -594,20 +746,30 @@ function spawnAnimals() {
 }
 
 function updateAnimals(dt, time) {
+  if (callTimer > 0) callTimer -= dt;
+
   for (const a of animals) {
     const g = a.group;
 
     if (a.kind === "dog") {
-      const dxp = player.x - g.position.x;
-      const dzp = player.z - g.position.z;
-      const far = Math.hypot(dxp, dzp);
-      if (far > 7) {
-        a.tx = player.x;
-        a.tz = player.z;
-      } else if (far < 4) {
-        a.tx = g.position.x - dxp * 2;
-        a.tz = g.position.z - dzp * 2;
+      if (ballSpeed() > 1.2) {
+        a.tx = ball.x;
+        a.tz = ball.z;
+      } else {
+        const dxp = player.x - g.position.x;
+        const dzp = player.z - g.position.z;
+        const far = Math.hypot(dxp, dzp);
+        if (far > 7) {
+          a.tx = player.x;
+          a.tz = player.z;
+        } else if (far < 4) {
+          a.tx = g.position.x - dxp * 2;
+          a.tz = g.position.z - dzp * 2;
+        }
       }
+    } else if (callTimer > 0 && (a.kind === "steve" || a.kind === "girl")) {
+      a.tx = player.x + (a.kind === "steve" ? 1.5 : -1.5);
+      a.tz = player.z + 1.5;
     } else if (a.follow) {
       a.tx = a.follow.group.position.x + a.offset;
       a.tz = a.follow.group.position.z + a.offset * 0.6;
@@ -839,6 +1001,83 @@ function blip(freq, dur = 0.1, type = "sine", gain = 0.07) {
   osc.stop(t0 + dur + 0.03);
 }
 
+
+// ------------------------------------------------------------------ мяч
+
+const ballMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(0.36, 14, 12),
+  new THREE.MeshLambertMaterial({ color: 0xff5a5a }),
+);
+scene.add(ballMesh);
+
+const ball = { x: 2.5, y: 8, z: 6.5, vx: 0, vy: 0, vz: 0 };
+
+function resetBall() {
+  ball.x = player.x + 2;
+  ball.z = player.z + 2;
+  ball.y = terrainHeight(Math.floor(ball.x), Math.floor(ball.z)) + 2;
+  ball.vx = ball.vy = ball.vz = 0;
+}
+
+function updateBall(dt) {
+  ball.vy -= 22 * dt;
+  ball.x += ball.vx * dt;
+  ball.y += ball.vy * dt;
+  ball.z += ball.vz * dt;
+
+  const ground = terrainHeight(Math.floor(ball.x), Math.floor(ball.z)) + 1.36;
+  if (ball.y < ground) {
+    ball.y = ground;
+    ball.vy = -ball.vy * 0.45;
+    ball.vx *= 0.86;
+    ball.vz *= 0.86;
+    if (Math.abs(ball.vy) < 0.7) ball.vy = 0;
+  }
+
+  ball.vx *= 1 - dt * 0.9;
+  ball.vz *= 1 - dt * 0.9;
+
+  ballMesh.position.set(ball.x, ball.y, ball.z);
+  ballMesh.rotation.x += ball.vz * dt * 1.6;
+  ballMesh.rotation.z -= ball.vx * dt * 1.6;
+
+  if (Math.abs(ball.x) > BOUND.x || Math.abs(ball.z) > BOUND.z) resetBall();
+}
+
+function ballSpeed() {
+  return Math.hypot(ball.vx, ball.vz);
+}
+
+function hitBall(clientX, clientY) {
+  const rect = canvasEl.getBoundingClientRect();
+  tapNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  tapNdc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  tapRay.setFromCamera(tapNdc, camera);
+  return tapRay.intersectObject(ballMesh, false).length > 0;
+}
+
+function kickBall() {
+  const dir = lookDirection();
+  ball.vx = dir.x * 8;
+  ball.vy = 5.2;
+  ball.vz = dir.z * 8;
+  blip(240, 0.09, "square", 0.06);
+  burst(Math.floor(ball.x), Math.floor(ball.y), Math.floor(ball.z), 0xff8a8a);
+}
+
+// ------------------------------------------------------------------ клич
+
+let callTimer = 0;
+
+function callFriends() {
+  callTimer = 8;
+  blip(660, 0.12, "sine", 0.06);
+  setTimeout(() => blip(880, 0.14, "sine", 0.05), 130);
+  for (const a of animals) {
+    if (a.kind === "steve" || a.kind === "girl" || a.kind === "dog") a.hop = 0.5;
+  }
+}
+
 // ------------------------------------------------------------------ игрок
 
 const player = {
@@ -919,6 +1158,12 @@ function clearSpot(x, z) {
 
 function spawnPlayer() {
   let best = null;
+
+  // сначала пробуем площадь города
+  for (const [px, pz] of [[0, 6], [0, 10], [4, 8], [-4, 8]]) {
+    const h = clearSpot(px, pz);
+    if (h >= 0) { best = { x: px, z: pz, h }; break; }
+  }
 
   for (let r = 0; r <= 10 && !best; r++) {
     for (let dx = -r; dx <= r && !best; dx++) {
@@ -1078,10 +1323,21 @@ function torchAt(target) {
 const undoStack = [];
 
 function act(clientX, clientY) {
+  if (hitBall(clientX, clientY)) {
+    kickBall();
+    return;
+  }
+
   const animal = hitAnimal(clientX, clientY);
   if (animal) {
     animal.hop = 0.45;
     animalSound(animal.kind);
+    burst(
+      Math.floor(animal.group.position.x),
+      Math.floor(animal.group.position.y),
+      Math.floor(animal.group.position.z),
+      0xff7fb0,
+    );
     return;
   }
 
@@ -1263,6 +1519,9 @@ modeBtn.addEventListener("click", () => {
   hideHint();
 });
 syncMode();
+
+const callBtn = document.getElementById("btn-call");
+if (callBtn) callBtn.addEventListener("click", callFriends);
 
 const jumpBtn = document.getElementById("btn-jump");
 let jumpQueued = false;
@@ -1515,6 +1774,7 @@ function tick(now) {
   }
 
   updateParticles(dt);
+  updateBall(dt);
   updateAnimals(dt, now / 1000);
   updateSky(now);
 
