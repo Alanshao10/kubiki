@@ -13,7 +13,7 @@ const ROWS = 4;
 const T = {
   grassTop: 0, grassSide: 1, dirt: 2, stone: 3,
   sand: 4, woodTop: 5, woodSide: 6, leaves: 7,
-  brick: 8, water: 9, planks: 10, cobble: 11,
+  brick: 8, water: 9, planksTex: 10, cobble: 11, torch: 12, glass: 13,
 };
 
 const TYPES = [
@@ -24,11 +24,12 @@ const TYPES = [
   { name: "дерево", top: T.woodTop, side: T.woodSide, bottom: T.woodTop, inPalette: true },
   { name: "листва", top: T.leaves, side: T.leaves, bottom: T.leaves, inPalette: true },
   { name: "кирпич", top: T.brick, side: T.brick, bottom: T.brick, inPalette: true },
-  { name: "доски",  top: T.planks, side: T.planks, bottom: T.planks, inPalette: true },
+  { name: "доски",  top: T.planksTex, side: T.planksTex, bottom: T.planksTex, inPalette: true },
   { name: "вода",   top: T.water, side: T.water, bottom: T.water, inPalette: false },
+  { name: "факел",  top: T.torch, side: T.torch, bottom: T.torch, inPalette: false },
 ];
 
-const GRASS = 0, DIRT = 1, STONE = 2, SAND = 3, WOOD = 4, LEAF = 5, BRICK = 6, PLANKS = 7, WATER = 8;
+const GRASS = 0, DIRT = 1, STONE = 2, SAND = 3, WOOD = 4, LEAF = 5, BRICK = 6, PLANKS = 7, WATER = 8, TORCH = 9;
 
 // ------------------------------------------------------------------ атлас текстур
 
@@ -110,9 +111,17 @@ function buildAtlas() {
     return hsl(208 + rnd(-4, 4), 65, 52 + rnd(-4, 4));
   });
   // доски
-  paint(T.planks, (x, y) => {
+  paint(T.planksTex, (x, y) => {
     if (y % 5 === 0) return hsl(28, 35, 34);
     return hsl(31 + rnd(-3, 3), 38, 44 + rnd(-3, 3));
+  });
+  // факел: светящееся пламя
+  paint(T.torch, (x, y) => {
+    const d = Math.hypot(x - 7.5, y - 7.5);
+    if (d < 2.6) return hsl(52, 100, 88);
+    if (d < 4.2) return hsl(42, 100, 70);
+    if (d < 5.6) return hsl(32, 95, 56);
+    return hsl(28, 60, 34);
   });
   // булыжник
   paint(T.cobble, (x, y) => {
@@ -425,6 +434,13 @@ const blockMaterial = new THREE.MeshLambertMaterial({
   alphaTest: 0.35,
 });
 
+const torchMaterial = new THREE.MeshLambertMaterial({
+  map: atlasTexture,
+  alphaTest: 0.35,
+  emissive: new THREE.Color(0xffb347),
+  emissiveIntensity: 0.85,
+});
+
 // геометрия кубика с UV под атлас
 function blockGeometry(topTile, sideTile, bottomTile) {
   const geo = new THREE.BoxGeometry(1, 1, 1);
@@ -453,7 +469,7 @@ const indexByType = [];
 for (let t = 0; t < TYPES.length; t++) {
   const def = TYPES[t];
   const geo = blockGeometry(def.top, def.side, def.bottom);
-  const mesh = new THREE.InstancedMesh(geo, blockMaterial, MAX_PER_TYPE);
+  const mesh = new THREE.InstancedMesh(geo, t === TORCH ? torchMaterial : blockMaterial, MAX_PER_TYPE);
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   mesh.frustumCulled = false;
   mesh.count = 0;
@@ -719,6 +735,76 @@ function hitAnimal(clientX, clientY) {
   return animals.find((a) => a.group === obj) || null;
 }
 
+// ------------------------------------------------------------------ инструменты
+
+function toolBurst(x, y, z, color) {
+  burst(x, y, z, color);
+  blip(480 + Math.random() * 120, 0.08, "sine", 0.05);
+}
+
+function hammerAt(target) {
+  const { hit, prev } = target;
+  const nx = prev.x - hit.x, ny = prev.y - hit.y, nz = prev.z - hit.z;
+  let placed = 0;
+
+  for (let a = -1; a <= 1; a++) {
+    for (let b = -1; b <= 1; b++) {
+      let x = prev.x, y = prev.y, z = prev.z;
+      if (nx !== 0) { y += a; z += b; }
+      else if (ny !== 0) { x += a; z += b; }
+      else { x += a; y += b; }
+
+      if (!inside(x, y, z)) continue;
+      if (world.has(key(x, y, z))) continue;
+      setBlock(x, y, z, state.type);
+      placed++;
+    }
+  }
+
+  if (!placed) return;
+
+  // если стена встала вокруг игрока — поднимаем его наверх
+  if (hits(player.x, player.y, player.z)) {
+    let guard = 0;
+    while (hits(player.x, player.y, player.z) && guard < 6) {
+      player.y += 1;
+      guard++;
+    }
+    player.vy = 0;
+  }
+
+  undoStack.push({ op: "bulk", cells: [] });
+  burst(prev.x, prev.y, prev.z, colorOf(state.type));
+  blip(320, 0.14, "triangle", 0.07);
+  progress.placed += placed;
+  checkMilestones();
+  rebuild();
+  scheduleSave();
+  hideHint();
+}
+
+function paintAt(target) {
+  const { x, y, z } = target.hit;
+  if (!world.has(key(x, y, z))) return;
+  world.set(key(x, y, z), state.type);
+  burst(x, y, z, colorOf(state.type));
+  blip(660, 0.1, "sine", 0.06);
+  rebuild();
+  scheduleSave();
+  hideHint();
+}
+
+function torchAt(target) {
+  const { x, y, z } = target.prev;
+  if (!inside(x, y, z) || world.has(key(x, y, z))) return;
+  setBlock(x, y, z, TORCH);
+  burst(x, y, z, 0xffb347);
+  blip(880, 0.12, "sine", 0.06);
+  rebuild();
+  scheduleSave();
+  hideHint();
+}
+
 // ------------------------------------------------------------------ действия
 
 const undoStack = [];
@@ -734,6 +820,10 @@ function act(clientX, clientY) {
   const target = raycastAt(clientX, clientY) || raycastBlock();
   window.__acts = Object.assign(window.__acts || {}, { calls: (window.__acts?.calls || 0) + 1, hit: !!target, at: [Math.round(clientX || 0), Math.round(clientY || 0)] });
   if (!target) return;
+
+  if (state.tool === "hammer") { hammerAt(target); return; }
+  if (state.tool === "paint") { paintAt(target); return; }
+  if (state.tool === "torch") { torchAt(target); return; }
 
   if (state.mode === "dig") {
     const { x, y, z } = target.hit;
@@ -827,7 +917,7 @@ function showAward(stars) {
 
 // ------------------------------------------------------------------ управление
 
-const state = { mode: "build", type: 0 };
+const state = { mode: "build", type: 0, tool: "pick" };
 
 const stickEl = document.getElementById("stick");
 const knobEl = document.getElementById("stick-knob");
@@ -956,6 +1046,54 @@ TYPES.forEach((def, i) => {
 
   slotEls.push(b);
   hotbar.appendChild(b);
+});
+
+// инструменты
+const TOOLS = [
+  {
+    id: "pick",
+    name: "Кирка",
+    icon: '<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l7-7"/><path d="M9 6c3-2 8-1 10 2-3-1-6 0-8 2"/></svg>',
+  },
+  {
+    id: "hammer",
+    name: "Молоток",
+    icon: '<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l7-7"/><rect x="10" y="4" width="9" height="6" rx="1.5"/></svg>',
+  },
+  {
+    id: "paint",
+    name: "Краска",
+    icon: '<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l6-6"/><path d="M11 13l3-9 6 2-3 9z"/><path d="M9 17a2 2 0 1 0 0.01 0"/></svg>',
+  },
+  {
+    id: "torch",
+    name: "Факел",
+    icon: '<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V11"/><path d="M12 3c2.5 2 4 3.6 4 5.5a4 4 0 0 1-8 0C8 6.6 9.5 5 12 3z"/></svg>',
+  },
+];
+
+const toolsEl = document.getElementById("tools");
+const toolBtns = [];
+
+TOOLS.forEach((tool) => {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "tool" + (tool.id === state.tool ? " active" : "");
+  b.innerHTML = tool.icon;
+  b.setAttribute("aria-label", tool.name);
+  b.addEventListener("click", () => {
+    state.tool = tool.id;
+    toolBtns.forEach((el) => el.classList.remove("active"));
+    b.classList.add("active");
+    if (tool.id !== "pick") {
+      state.mode = "build";
+      syncMode();
+    }
+    blip(520 + Math.random() * 90, 0.07, "sine", 0.04);
+    hideHint();
+  });
+  toolsEl.appendChild(b);
+  toolBtns.push(b);
 });
 
 // подсказка
