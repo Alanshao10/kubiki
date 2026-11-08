@@ -248,12 +248,57 @@ scene.fog = new THREE.Fog(0xa9d4ff, 45, 110);
 
 const camera = new THREE.PerspectiveCamera(72, 1, 0.1, 400);
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0x9aa79a, 1.1));
+const hemi = new THREE.HemisphereLight(0xffffff, 0x9aa79a, 1.1);
+scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffffff, 0.75);
 sun.position.set(30, 60, 20);
 scene.add(sun);
 
 // облака
+// ---------- небо, день и ночь ----------
+const DAY_MS = 180000; // полный круг — три минуты
+
+const skyDay = new THREE.Color(0x8fc7ff);
+const skyNight = new THREE.Color(0x0b1330);
+const fogDay = new THREE.Color(0xa9d4ff);
+const fogNight = new THREE.Color(0x0b1330);
+
+const starGeo = new THREE.BufferGeometry();
+const starPositions = new Float32Array(420 * 3);
+for (let i = 0; i < 420; i++) {
+  const a = Math.random() * Math.PI * 2;
+  const b = Math.random() * Math.PI * 0.5 + 0.05;
+  const r = 170;
+  starPositions[i * 3] = Math.cos(a) * Math.cos(b) * r;
+  starPositions[i * 3 + 1] = Math.sin(b) * r;
+  starPositions[i * 3 + 2] = Math.sin(a) * Math.cos(b) * r;
+}
+starGeo.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
+const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({
+  color: 0xffffff, size: 1.6, transparent: true, opacity: 0, depthWrite: false, fog: false,
+}));
+stars.frustumCulled = false;
+scene.add(stars);
+
+function updateSky(timeMs) {
+  const phase = typeof window.__dayPhase === "number"
+    ? window.__dayPhase
+    : (timeMs % DAY_MS) / DAY_MS;
+
+  const height = Math.sin(phase * Math.PI * 2);
+  const day = Math.max(0, height);
+
+  scene.background.copy(skyNight).lerp(skyDay, day);
+  scene.fog.color.copy(fogNight).lerp(fogDay, day);
+
+  sun.intensity = 0.12 + 0.75 * day;
+  hemi.intensity = 0.3 + 0.85 * day;
+  stars.material.opacity = Math.max(0, 1 - day * 1.6);
+
+  const a = phase * Math.PI * 2;
+  sun.position.set(Math.cos(a) * 45, Math.max(-10, Math.sin(a) * 55), 20);
+}
+
 const cloudMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.92 });
 const clouds = new THREE.Group();
 for (let i = 0; i < 10; i++) {
@@ -1065,6 +1110,7 @@ function tick(now) {
 
   updateParticles(dt);
   updateAnimals(dt, now / 1000);
+  updateSky(now);
 
   for (let i = 0; i < clouds.children.length; i++) {
     const c = clouds.children[i];
