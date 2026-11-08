@@ -422,10 +422,61 @@ const BUILDERS = {
     g.add(box(0.45, 0.08, 0.08, 0x9c6b3f, -0.66, 0.78, 0));
     legs(g, 0x8a5f37, 0.14, 0.34, 0.3, 0.14);
   },
+  steve(g) {
+    const skin = 0xe0ac69, shirt = 0x00a9a9, pants = 0x3a3ab0, hair = 0x442b18;
+
+    g.add(box(0.5, 0.62, 0.28, shirt, 0, 1.0, 0));
+    g.add(box(0.42, 0.42, 0.4, skin, 0, 1.63, 0));
+    g.add(box(0.44, 0.14, 0.42, hair, 0, 1.86, 0));
+    g.add(box(0.06, 0.30, 0.42, hair, -0.2, 1.66, 0));
+    g.add(box(0.06, 0.30, 0.42, hair, 0.2, 1.66, 0));
+    addEyes(g, 0.21, 1.66, 0.1, 0.06);
+    g.add(box(0.1, 0.03, 0.02, 0x8b4a3a, 0.21, 1.52, 0));
+
+    for (const s of [-1, 1]) {
+      const arm = new THREE.Group();
+      arm.position.set(0, 1.34, s * 0.2);
+      arm.add(box(0.14, 0.5, 0.14, shirt, 0, -0.25, 0));
+      arm.add(box(0.14, 0.14, 0.14, skin, 0, -0.54, 0));
+      arm.rotation.x = s * 0.12;
+      g.add(arm);
+      if (s === 1) g.userData.arm = arm;
+      else g.userData.armL = arm;
+    }
+
+    legs(g, pants, 0.16, 0.7, 0.13, 0.06);
+  },
+
+  girl(g) {
+    const skin = 0xf0c8a0, shirt = 0x7ba45c, pants = 0x8b5a2b, hair = 0xb35f1e;
+
+    g.add(box(0.48, 0.6, 0.27, shirt, 0, 0.99, 0));
+    g.add(box(0.42, 0.42, 0.4, skin, 0, 1.62, 0));
+    g.add(box(0.44, 0.16, 0.42, hair, 0, 1.86, 0));
+    g.add(box(0.1, 0.62, 0.42, hair, -0.21, 1.58, 0));
+    g.add(box(0.1, 0.62, 0.42, hair, 0.21, 1.58, 0));
+    g.add(box(0.12, 0.44, 0.14, hair, 0, 1.44, -0.22));
+    addEyes(g, 0.21, 1.65, 0.1, 0.06);
+    g.add(box(0.1, 0.03, 0.02, 0xc2557a, 0.21, 1.51, 0));
+
+    for (const s of [-1, 1]) {
+      const arm = new THREE.Group();
+      arm.position.set(0, 1.33, s * 0.2);
+      arm.add(box(0.13, 0.5, 0.13, shirt, 0, -0.25, 0));
+      arm.add(box(0.13, 0.13, 0.13, skin, 0, -0.54, 0));
+      arm.rotation.x = s * 0.12;
+      g.add(arm);
+      if (s === 1) g.userData.arm = arm;
+      else g.userData.armL = arm;
+    }
+
+    legs(g, pants, 0.15, 0.68, 0.13, 0.06);
+  },
 };
 
 const ANIMAL_SIZE = {
   pig: 1, cow: 1.1, sheep: 1.05, chicken: 1, chick: 0.85, cat: 0.85, dog: 0.95,
+  steve: 1, girl: 0.95,
 };
 
 function animalSound(kind) {
@@ -455,6 +506,12 @@ function animalSound(kind) {
       blip(220, 0.09, "square", 0.06);
       setTimeout(() => blip(190, 0.1, "square", 0.05), 140);
       break;
+    case "steve":
+    case "girl":
+      blip(523, 0.1, "sine", 0.05);
+      setTimeout(() => blip(659, 0.1, "sine", 0.045), 110);
+      setTimeout(() => blip(784, 0.14, "sine", 0.04), 220);
+      break;
     default:
       blip(320, 0.09, "sawtooth", 0.05);
       setTimeout(() => blip(260, 0.1, "sawtooth", 0.04), 90);
@@ -471,6 +528,9 @@ function makeAnimal(kind, x, z, follow) {
   animals.push({
     kind,
     group: g,
+    arm: g.userData.arm || null,
+    wave: 0,
+    greetIn: 2 + Math.random() * 4,
     tx: x + 0.5,
     tz: z + 0.5,
     speed: kind === "chick" ? 1.3 : kind === "cow" ? 0.4 : kind === "sheep" ? 0.5 : 0.8 + Math.random() * 0.5,
@@ -478,6 +538,8 @@ function makeAnimal(kind, x, z, follow) {
     hop: 0,
     follow: follow || null,
     offset: follow ? (Math.random() - 0.5) * 1.6 : 0,
+    homeX: x + 0.5,
+    homeZ: z + 0.5,
   });
 }
 
@@ -503,6 +565,32 @@ function spawnAnimals() {
 
   makeAnimal("cat", 1, 6);
   makeAnimal("dog", 7, 13);
+
+  // друзья появляются рядом с игроком, на его высоте
+  const px = Number.isFinite(player.x) ? player.x : 0.5;
+  const pz = Number.isFinite(player.z) ? player.z : 8.5;
+  const baseY = player.y - 1;
+
+  const spotNear = (minD, maxD) => {
+    for (let i = 0; i < 80; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const d = minD + Math.random() * (maxD - minD);
+      const x = Math.round(px + Math.cos(ang) * d);
+      const z = Math.round(pz + Math.sin(ang) * d);
+      if (Math.abs(terrainHeight(x, z) - baseY) <= 1) return [x, z];
+    }
+    return [Math.round(px) + 2, Math.round(pz) - 2];
+  };
+
+  // ставим друзей прямо перед игроком
+  const ahead = (dist, side) => {
+    const a = player.yaw + side;
+    return [Math.round(px + Math.sin(a) * dist), Math.round(pz + Math.cos(a) * dist)];
+  };
+  const [fx, fz] = ahead(5, 0.18);
+  const [gx, gz] = ahead(3.5, -0.3);
+  makeAnimal("steve", fx, fz);
+  makeAnimal("girl", gx, gz);
 }
 
 function updateAnimals(dt, time) {
@@ -531,8 +619,12 @@ function updateAnimals(dt, time) {
 
     if (dist < 0.5) {
       if (!a.follow && a.kind !== "dog") {
-        a.tx = THREE.MathUtils.clamp(g.position.x - 8 + Math.random() * 16, -17, 17);
-        a.tz = THREE.MathUtils.clamp(g.position.z - 8 + Math.random() * 16, -17, 17);
+        const isPerson = a.kind === "steve" || a.kind === "girl";
+        const radius = isPerson ? 3 : 8;
+        const cx = isPerson ? a.homeX : g.position.x;
+        const cz = isPerson ? a.homeZ : g.position.z;
+        a.tx = THREE.MathUtils.clamp(cx - radius + Math.random() * radius * 2, -17, 17);
+        a.tz = THREE.MathUtils.clamp(cz - radius + Math.random() * radius * 2, -17, 17);
       }
     } else {
       const step = Math.min(a.speed * dt, dist);
@@ -549,9 +641,29 @@ function updateAnimals(dt, time) {
       a.hop -= dt;
       g.position.y += Math.sin((1 - a.hop) * Math.PI) * 0.5;
     }
+
+    // машут рукой: по тапу и когда игрок рядом
+    const nearPlayer = Math.hypot(player.x - g.position.x, player.z - g.position.z) < 5;
+    if (a.kind === "steve" || a.kind === "girl") {
+      a.greetIn -= dt;
+      if (nearPlayer && a.greetIn <= 0 && a.wave <= 0) {
+        a.wave = 1.1;
+        a.greetIn = 7 + Math.random() * 6;
+        if (Math.random() < 0.5) animalSound(a.kind);
+      }
+    }
+
+    if (a.arm) {
+      if (a.wave > 0) {
+        a.wave -= dt;
+        a.arm.rotation.z = -1.5 + Math.sin(a.wave * 16) * 0.35;
+      } else {
+        a.arm.rotation.z = 0;
+      }
+    }
   }
 
-  window.__dbg = Object.assign(window.__dbg || {}, { animals: animals.length });
+  window.__dbg = Object.assign(window.__dbg || {}, { animals: animals.length, kinds: animals.map((a) => a.kind).join(','), people: animals.filter((a) => a.kind === 'steve' || a.kind === 'girl').map((a) => [Math.round(a.group.position.x), Math.round(a.group.position.z), Math.round(Math.hypot(a.group.position.x - player.x, a.group.position.z - player.z))]) });
 }
 
 const atlasTexture = new THREE.CanvasTexture(buildAtlas());
@@ -797,13 +909,38 @@ function moveVertical(dt) {
   }
 }
 
+function clearSpot(x, z) {
+  const h = terrainHeight(x, z);
+  for (let dy = 1; dy <= 4; dy++) {
+    if (world.has(key(x, h + dy, z))) return -1;
+  }
+  return h;
+}
+
 function spawnPlayer() {
-  const h = terrainHeight(0, 8);
-  player.x = 0.5;
-  player.z = 8.5;
-  player.y = h + 1.2;
+  let best = null;
+
+  for (let r = 0; r <= 10 && !best; r++) {
+    for (let dx = -r; dx <= r && !best; dx++) {
+      for (let dz = -r; dz <= r && !best; dz++) {
+        const x = dx;
+        const z = 6 + dz;
+        const h = clearSpot(x, z);
+        if (h >= 0) best = { x, z, h };
+      }
+    }
+  }
+
+  if (!best) best = { x: 0, z: 8, h: terrainHeight(0, 8) };
+
+  player.x = best.x + 0.5;
+  player.z = best.z + 0.5;
+  player.y = best.h + 1.2;
+  player.vy = 0;
+
+  // смотрим на домик
   player.yaw = Math.atan2(-5.5 - player.x, 6.5 - player.z);
-  player.pitch = -0.1;
+  player.pitch = -0.08;
 }
 
 // ------------------------------------------------------------------ наведение
