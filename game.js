@@ -911,7 +911,7 @@ function moveVertical(dt) {
 
 function clearSpot(x, z) {
   const h = terrainHeight(x, z);
-  for (let dy = 1; dy <= 4; dy++) {
+  for (let dy = 1; dy <= 12; dy++) {
     if (world.has(key(x, h + dy, z))) return -1;
   }
   return h;
