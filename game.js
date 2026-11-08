@@ -332,82 +332,217 @@ const animalGroup = new THREE.Group();
 scene.add(animalGroup);
 const animals = [];
 
-const pigBodyMat = new THREE.MeshLambertMaterial({ color: 0xf0a0ab });
-const pigHeadMat = new THREE.MeshLambertMaterial({ color: 0xf7b5be });
-const pigSnoutMat = new THREE.MeshLambertMaterial({ color: 0xe0899a });
-const pigLegMat = new THREE.MeshLambertMaterial({ color: 0xd98d9a });
-const eyeMat = new THREE.MeshBasicMaterial({ color: 0x2b2b2b });
+const matCache = new Map();
+function mat(color) {
+  if (!matCache.has(color)) matCache.set(color, new THREE.MeshLambertMaterial({ color }));
+  return matCache.get(color);
+}
 
-function makePig(x, z) {
+function box(w, h, d, color, x = 0, y = 0, z = 0) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color));
+  m.position.set(x, y, z);
+  return m;
+}
+
+function addEyes(g, x, y, spread, size = 0.06) {
+  for (const s of [-spread, spread]) g.add(box(size, size * 1.2, size, 0x22262b, x, y, s));
+}
+
+function legs(g, color, w, h, dx, dz) {
+  for (const sx of [-dx, dx]) {
+    for (const sz of [-dz, dz]) g.add(box(w, h, w, color, sx, h / 2, sz));
+  }
+}
+
+const BUILDERS = {
+  pig(g) {
+    g.add(box(1.05, 0.55, 0.7, 0xf0a0ab, 0, 0.62, 0));
+    g.add(box(0.5, 0.5, 0.5, 0xf7b5be, 0.72, 0.68, 0));
+    g.add(box(0.14, 0.22, 0.28, 0xe0899a, 0.99, 0.64, 0));
+    addEyes(g, 0.92, 0.76, 0.11, 0.06);
+    for (const s of [-0.11, 0.11]) g.add(box(0.1, 0.12, 0.16, 0xf0a0ab, 0.62, 0.95, s));
+    legs(g, 0xd98d9a, 0.16, 0.42, 0.32, 0.22);
+  },
+
+  cow(g) {
+    g.add(box(1.4, 0.8, 0.9, 0xf3f1ea, 0, 0.8, 0));
+    for (const [sx, sz] of [[-0.35, 0.2], [0.25, -0.25], [0.45, 0.22]]) {
+      g.add(box(0.34, 0.34, 0.34, 0x2f3338, sx, 0.95, sz));
+    }
+    g.add(box(0.55, 0.55, 0.55, 0xf3f1ea, 0.9, 0.85, 0));
+    g.add(box(0.2, 0.26, 0.5, 0xe8b7b0, 1.18, 0.72, 0));
+    addEyes(g, 1.12, 0.98, 0.15, 0.07);
+    for (const s of [-0.18, 0.18]) g.add(box(0.08, 0.16, 0.1, 0xd8d3c6, 0.78, 1.16, s));
+    legs(g, 0x3b4046, 0.18, 0.55, 0.45, 0.3);
+  },
+
+  sheep(g) {
+    g.add(box(1.1, 0.85, 0.95, 0xf6f4ee, 0, 0.85, 0));
+    g.add(box(1.15, 0.5, 1.0, 0xffffff, 0, 1.2, 0));
+    g.add(box(0.45, 0.42, 0.45, 0x4a4f55, 0.72, 0.98, 0));
+    addEyes(g, 0.92, 1.06, 0.12, 0.06);
+    for (const s of [-0.16, 0.16]) g.add(box(0.1, 0.2, 0.12, 0x4a4f55, 0.62, 1.2, s));
+    legs(g, 0x4a4f55, 0.16, 0.45, 0.36, 0.28);
+  },
+
+  chicken(g) {
+    g.add(box(0.55, 0.5, 0.45, 0xfaf7f0, 0, 0.6, 0));
+    g.add(box(0.32, 0.32, 0.3, 0xfaf7f0, 0.32, 0.9, 0));
+    g.add(box(0.12, 0.1, 0.1, 0xf2b632, 0.52, 0.86, 0));
+    g.add(box(0.1, 0.14, 0.22, 0xd94b4b, 0.3, 1.09, 0));
+    addEyes(g, 0.46, 0.98, 0.11, 0.05);
+    for (const s of [-0.12, 0.12]) g.add(box(0.08, 0.06, 0.14, 0xfaf7f0, 0, 0.55, s));
+    for (const s of [-0.1, 0.1]) g.add(box(0.07, 0.32, 0.07, 0xf2b632, 0, 0.17, s));
+  },
+
+  chick(g) {
+    g.add(box(0.3, 0.28, 0.26, 0xffe066, 0, 0.32, 0));
+    g.add(box(0.22, 0.22, 0.2, 0xffe066, 0.18, 0.5, 0));
+    g.add(box(0.09, 0.07, 0.07, 0xf28b32, 0.32, 0.48, 0));
+    addEyes(g, 0.3, 0.55, 0.08, 0.04);
+    for (const s of [-0.07, 0.07]) g.add(box(0.05, 0.18, 0.05, 0xf28b32, 0, 0.1, s));
+  },
+
+  cat(g) {
+    g.add(box(0.75, 0.4, 0.36, 0xf0a04a, 0, 0.42, 0));
+    g.add(box(0.38, 0.36, 0.36, 0xf5ad5c, 0.46, 0.56, 0));
+    for (const s of [-0.12, 0.12]) g.add(box(0.1, 0.14, 0.08, 0xf0a04a, 0.44, 0.78, s));
+    addEyes(g, 0.6, 0.62, 0.1, 0.05);
+    g.add(box(0.08, 0.08, 0.1, 0xe07b7b, 0.63, 0.52, 0));
+    g.add(box(0.5, 0.08, 0.08, 0xf0a04a, -0.6, 0.62, 0));
+    legs(g, 0xe08f3f, 0.11, 0.24, 0.24, 0.12);
+  },
+
+  dog(g) {
+    g.add(box(0.95, 0.5, 0.42, 0x9c6b3f, 0, 0.55, 0));
+    g.add(box(0.44, 0.42, 0.42, 0xa87748, 0.58, 0.68, 0));
+    g.add(box(0.2, 0.16, 0.24, 0x6f4a2a, 0.82, 0.6, 0));
+    for (const s of [-0.15, 0.15]) g.add(box(0.1, 0.18, 0.1, 0x7a5230, 0.5, 0.94, s));
+    addEyes(g, 0.78, 0.74, 0.12, 0.06);
+    g.add(box(0.45, 0.08, 0.08, 0x9c6b3f, -0.66, 0.78, 0));
+    legs(g, 0x8a5f37, 0.14, 0.34, 0.3, 0.14);
+  },
+};
+
+const ANIMAL_SIZE = {
+  pig: 1, cow: 1.1, sheep: 1.05, chicken: 1, chick: 0.85, cat: 0.85, dog: 0.95,
+};
+
+function animalSound(kind) {
+  switch (kind) {
+    case "cow":
+      blip(140, 0.35, "sawtooth", 0.07);
+      setTimeout(() => blip(110, 0.3, "sawtooth", 0.05), 180);
+      break;
+    case "chicken":
+      blip(900, 0.07, "square", 0.04);
+      setTimeout(() => blip(1150, 0.06, "square", 0.035), 90);
+      setTimeout(() => blip(950, 0.05, "square", 0.03), 170);
+      break;
+    case "chick":
+      blip(1500, 0.05, "sine", 0.03);
+      setTimeout(() => blip(1650, 0.05, "sine", 0.025), 80);
+      break;
+    case "sheep":
+      blip(420, 0.16, "sawtooth", 0.05);
+      setTimeout(() => blip(380, 0.18, "sawtooth", 0.045), 150);
+      break;
+    case "cat":
+      blip(620, 0.12, "sine", 0.05);
+      setTimeout(() => blip(820, 0.16, "sine", 0.04), 110);
+      break;
+    case "dog":
+      blip(220, 0.09, "square", 0.06);
+      setTimeout(() => blip(190, 0.1, "square", 0.05), 140);
+      break;
+    default:
+      blip(320, 0.09, "sawtooth", 0.05);
+      setTimeout(() => blip(260, 0.1, "sawtooth", 0.04), 90);
+  }
+}
+
+function makeAnimal(kind, x, z, follow) {
   const g = new THREE.Group();
-
-  const body = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.55, 0.7), pigBodyMat);
-  body.position.y = 0.62;
-  g.add(body);
-
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), pigHeadMat);
-  head.position.set(0.72, 0.68, 0);
-  g.add(head);
-
-  const snout = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.22, 0.28), pigSnoutMat);
-  snout.position.set(0.99, 0.64, 0);
-  g.add(snout);
-
-  for (const s of [-0.11, 0.11]) {
-    const ear = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.16), pigBodyMat);
-    ear.position.set(0.62, 0.95, s);
-    g.add(ear);
-    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.06), eyeMat);
-    eye.position.set(0.92, 0.76, s);
-    g.add(eye);
-  }
-
-  const legPos = [[-0.32, 0.22], [-0.32, -0.22], [0.32, 0.22], [0.32, -0.22]];
-  for (const [lx, lz] of legPos) {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.42, 0.16), pigLegMat);
-    leg.position.set(lx, 0.21, lz);
-    g.add(leg);
-  }
-
+  BUILDERS[kind](g);
+  g.scale.setScalar(ANIMAL_SIZE[kind] || 1);
   g.position.set(x + 0.5, terrainHeight(x, z) + 1, z + 0.5);
   animalGroup.add(g);
 
   animals.push({
+    kind,
     group: g,
-    tx: x, tz: z,
-    speed: 0.7 + Math.random() * 0.5,
+    tx: x + 0.5,
+    tz: z + 0.5,
+    speed: kind === "chick" ? 1.3 : kind === "cow" ? 0.4 : kind === "sheep" ? 0.5 : 0.8 + Math.random() * 0.5,
     phase: Math.random() * 6.28,
     hop: 0,
+    follow: follow || null,
+    offset: follow ? (Math.random() - 0.5) * 1.6 : 0,
   });
 }
 
 function spawnAnimals() {
-  const spots = [[3, 12], [-4, 11], [10, 4], [-11, -3], [7, -3], [-2, -11]];
-  for (const [x, z] of spots) makePig(x, z);
-}
+  while (animalGroup.children.length) animalGroup.remove(animalGroup.children[0]);
+  animals.length = 0;
 
-const animalTarget = new THREE.Vector3();
+  makeAnimal("pig", 3, 12);
+  makeAnimal("pig", -4, 11);
+  makeAnimal("pig", 9, 5);
+
+  makeAnimal("cow", -12, 6);
+  makeAnimal("cow", 12, -6);
+
+  makeAnimal("sheep", -8, -4);
+  makeAnimal("sheep", 6, -9);
+
+  makeAnimal("chicken", -2, 10);
+  const hen = animals[animals.length - 1];
+  makeAnimal("chick", -2.4, 10.6, hen);
+  makeAnimal("chick", -1.4, 10.4, hen);
+  makeAnimal("chick", -2.1, 9.4, hen);
+
+  makeAnimal("cat", 1, 6);
+  makeAnimal("dog", 7, 13);
+}
 
 function updateAnimals(dt, time) {
   for (const a of animals) {
     const g = a.group;
-    const dx = a.tx + 0.5 - g.position.x;
-    const dz = a.tz + 0.5 - g.position.z;
+
+    if (a.kind === "dog") {
+      const dxp = player.x - g.position.x;
+      const dzp = player.z - g.position.z;
+      const far = Math.hypot(dxp, dzp);
+      if (far > 7) {
+        a.tx = player.x;
+        a.tz = player.z;
+      } else if (far < 4) {
+        a.tx = g.position.x - dxp * 2;
+        a.tz = g.position.z - dzp * 2;
+      }
+    } else if (a.follow) {
+      a.tx = a.follow.group.position.x + a.offset;
+      a.tz = a.follow.group.position.z + a.offset * 0.6;
+    }
+
+    const dx = a.tx - g.position.x;
+    const dz = a.tz - g.position.z;
     const dist = Math.hypot(dx, dz);
 
-    if (dist < 0.4) {
-      a.tx = THREE.MathUtils.clamp(g.position.x - 8 + Math.random() * 16, -17, 17);
-      a.tz = THREE.MathUtils.clamp(g.position.z - 8 + Math.random() * 16, -17, 17);
+    if (dist < 0.5) {
+      if (!a.follow && a.kind !== "dog") {
+        a.tx = THREE.MathUtils.clamp(g.position.x - 8 + Math.random() * 16, -17, 17);
+        a.tz = THREE.MathUtils.clamp(g.position.z - 8 + Math.random() * 16, -17, 17);
+      }
     } else {
-      const step = a.speed * dt;
+      const step = Math.min(a.speed * dt, dist);
       g.position.x += (dx / dist) * step;
       g.position.z += (dz / dist) * step;
       g.rotation.y = Math.atan2(dx, dz) - Math.PI / 2;
     }
 
-    // держимся поверхности и слегка подпрыгиваем на ходу
     const ground = terrainHeight(Math.floor(g.position.x), Math.floor(g.position.z)) + 1;
-    const bob = Math.abs(Math.sin(time * 4 + a.phase)) * 0.06;
+    const bob = Math.abs(Math.sin(time * 5 + a.phase)) * 0.07;
     g.position.y += (ground + bob - g.position.y) * Math.min(1, dt * 8);
 
     if (a.hop > 0) {
@@ -415,13 +550,9 @@ function updateAnimals(dt, time) {
       g.position.y += Math.sin((1 - a.hop) * Math.PI) * 0.5;
     }
   }
-}
 
-function oink() {
-  blip(320, 0.09, "sawtooth", 0.05);
-  setTimeout(() => blip(260, 0.1, "sawtooth", 0.04), 90);
+  window.__dbg = Object.assign(window.__dbg || {}, { animals: animals.length });
 }
-
 
 const atlasTexture = new THREE.CanvasTexture(buildAtlas());
 atlasTexture.magFilter = THREE.NearestFilter;
@@ -813,7 +944,7 @@ function act(clientX, clientY) {
   const animal = hitAnimal(clientX, clientY);
   if (animal) {
     animal.hop = 0.45;
-    oink();
+    animalSound(animal.kind);
     return;
   }
 
