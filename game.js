@@ -320,6 +320,16 @@ function buildCity() {
   // фонтан в центре
   buildFountain(9, 11, level);
 
+  // магазин с продавцом
+  buildShop(-10, 12, level);
+
+  // комнаты внутри домов
+  furnish(4, -6, 6, 5, level, 3);
+  furnish(12, -6, 5, 5, level, 3);
+  furnish(4, 4, 5, 5, level, 3);
+  furnish(12, 4, 6, 5, level, 4);
+  furnish(-6, 6, 5, 5, level, 3);
+
   // фонари вдоль улицы
   for (let z = -6; z <= 14; z += 5) {
     buildLamp(-3, z, level);
@@ -327,6 +337,105 @@ function buildCity() {
   }
 }
 
+
+
+// ------------------------------------------------------------------ магазин и загон
+
+function buildShop(x, z, level) {
+  const w = 6;
+  const d = 4;
+
+  flattenArea(x - 1, z - 1, x + w, z + d + 1, level);
+  fillArea(x, level, z, x + w - 1, level, z + d - 1, PLANKS);
+
+  // задняя и боковые стены
+  for (let y = 1; y <= 3; y++) {
+    for (let i = 0; i < w; i++) setBlock(x + i, level + y, z, BRICK);
+    for (let j = 0; j < d; j++) {
+      setBlock(x, level + y, z + j, PLANKS);
+      setBlock(x + w - 1, level + y, z + j, PLANKS);
+    }
+  }
+
+  // прилавок
+  for (let i = 1; i < w - 1; i++) {
+    setBlock(x + i, level + 1, z + d - 1, WOOD);
+  }
+
+  // витрина: цветные блоки на прилавке
+  setBlock(x + 1, level + 2, z + d - 1, SAND);
+  setBlock(x + 2, level + 2, z + d - 1, BRICK);
+  setBlock(x + 3, level + 2, z + d - 1, PLANKS);
+  setBlock(x + 4, level + 2, z + d - 1, LEAF);
+
+  // навес
+  fillArea(x - 1, level + 3, z + d, x + w, level + 3, z + d + 1, BRICK);
+
+  // фонари у входа
+  setBlock(x - 1, level + 1, z + d + 1, WOOD);
+  setBlock(x - 1, level + 2, z + d + 1, TORCH);
+  setBlock(x + w, level + 1, z + d + 1, WOOD);
+  setBlock(x + w, level + 2, z + d + 1, TORCH);
+}
+
+function buildPen(x, z, level) {
+  const w = 11;
+  const d = 9;
+
+  flattenArea(x - 1, z - 1, x + w, z + d, level);
+
+  // изгородь
+  for (let i = 0; i < w; i++) {
+    for (let y = 1; y <= 2; y++) {
+      setBlock(x + i, level + y, z, WOOD);
+      setBlock(x + i, level + y, z + d - 1, WOOD);
+    }
+  }
+  for (let j = 0; j < d; j++) {
+    for (let y = 1; y <= 2; y++) {
+      setBlock(x, level + y, z + j, WOOD);
+      setBlock(x + w - 1, level + y, z + j, WOOD);
+    }
+  }
+
+  // ворота
+  for (let y = 1; y <= 2; y++) {
+    delBlock(x + 5, level + y, z + d - 1);
+    delBlock(x + 6, level + y, z + d - 1);
+  }
+
+  // поилка и кормушка
+  for (let i = 2; i <= 3; i++) setBlock(x + i, level, z + 2, WATER);
+  setBlock(x + w - 3, level, z + 2, SAND);
+  setBlock(x + w - 4, level, z + 2, SAND);
+}
+
+function furnish(x, z, w, d, level, h) {
+  const midX = x + Math.floor(w / 2);
+
+  // перегородка с проходом
+  if (w >= 5) {
+    for (let y = 1; y <= h; y++) {
+      for (let j = 1; j < d - 1; j++) {
+        if (j === Math.floor(d / 2)) continue;
+        setBlock(midX, level + y, z + j, PLANKS);
+      }
+    }
+  }
+
+  // кровать
+  for (let i = 1; i <= 2; i++) setBlock(x + i, level + 1, z + 1, BRICK);
+  setBlock(x + 1, level + 1, z + 1, SAND);
+
+  // стол и стул
+  setBlock(x + w - 2, level + 1, z + 2, WOOD);
+  setBlock(x + w - 2, level + 2, z + 2, TORCH);
+  setBlock(x + w - 3, level + 1, z + 2, PLANKS);
+
+  // сундук
+  setBlock(x + w - 2, level + 1, z + d - 2, BRICK);
+  setBlock(x + w - 2, level + 2, z + d - 2, WOOD);
+}
 
 // ------------------------------------------------------------------ пещера
 
@@ -473,6 +582,7 @@ function generateWorld() {
   }
 
   buildCity();
+  buildPen(20, 6, 4);
   buildCave(4);
 
   // деревья
@@ -542,8 +652,9 @@ function updateSky(timeMs) {
   scene.background.copy(skyNight).lerp(skyDay, day);
   scene.fog.color.copy(fogNight).lerp(fogDay, day);
 
-  sun.intensity = 0.12 + 0.75 * day;
-  hemi.intensity = 0.3 + 0.85 * day;
+  const wet = typeof weather !== 'undefined' ? weather.rainFactor || 0 : 0;
+  sun.intensity = (0.12 + 0.75 * day) * (1 - wet * 0.45);
+  hemi.intensity = (0.3 + 0.85 * day) * (1 - wet * 0.3);
   stars.material.opacity = Math.max(0, 1 - day * 1.6);
 
   const a = phase * Math.PI * 2;
@@ -689,6 +800,32 @@ const BUILDERS = {
     legs(g, pants, 0.16, 0.7, 0.13, 0.06);
   },
 
+
+  seller(g) {
+    const skin = 0xd9a066, shirt = 0xf3f1ea, apron = 0x2f8f5b, pants = 0x3b3b46, hair = 0x2b2119;
+
+    g.add(box(0.5, 0.6, 0.28, shirt, 0, 1.0, 0));
+    g.add(box(0.5, 0.42, 0.3, apron, 0, 0.86, 0.02));
+    g.add(box(0.42, 0.42, 0.4, skin, 0, 1.63, 0));
+    g.add(box(0.44, 0.12, 0.42, hair, 0, 1.86, 0));
+    g.add(box(0.5, 0.08, 0.46, 0x2f8f5b, 0, 1.93, 0));
+    addEyes(g, 0.21, 1.66, 0.1, 0.06);
+    g.add(box(0.1, 0.03, 0.02, 0x8b4a3a, 0.21, 1.52, 0));
+
+    for (const s of [-1, 1]) {
+      const arm = new THREE.Group();
+      arm.position.set(0, 1.34, s * 0.2);
+      arm.add(box(0.14, 0.5, 0.14, shirt, 0, -0.25, 0));
+      arm.add(box(0.14, 0.14, 0.14, skin, 0, -0.54, 0));
+      arm.rotation.x = s * 0.12;
+      g.add(arm);
+      if (s === 1) g.userData.arm = arm;
+      else g.userData.armL = arm;
+    }
+
+    legs(g, pants, 0.16, 0.7, 0.13, 0.06);
+  },
+
   girl(g) {
     const skin = 0xf0c8a0, shirt = 0x7ba45c, pants = 0x8b5a2b, hair = 0xb35f1e;
 
@@ -718,7 +855,7 @@ const BUILDERS = {
 
 const ANIMAL_SIZE = {
   pig: 1, cow: 1.1, sheep: 1.05, chicken: 1, chick: 0.85, cat: 0.85, dog: 0.95,
-  steve: 1, girl: 0.95,
+  steve: 1, girl: 0.95, seller: 1,
 };
 
 function animalSound(kind) {
@@ -750,6 +887,7 @@ function animalSound(kind) {
       break;
     case "steve":
     case "girl":
+    case "seller":
       blip(523, 0.1, "sine", 0.05);
       setTimeout(() => blip(659, 0.1, "sine", 0.045), 110);
       setTimeout(() => blip(784, 0.14, "sine", 0.04), 220);
@@ -833,6 +971,7 @@ function spawnAnimals() {
   const [gx, gz] = ahead(3.5, -0.3);
   makeAnimal("steve", fx, fz);
   makeAnimal("girl", gx, gz);
+  makeAnimal("seller", -8, 14);
 }
 
 function updateAnimals(dt, time) {
@@ -857,7 +996,7 @@ function updateAnimals(dt, time) {
           a.tz = g.position.z - dzp * 2;
         }
       }
-    } else if (callTimer > 0 && (a.kind === "steve" || a.kind === "girl")) {
+    } else if (callTimer > 0 && (a.kind === "steve" || a.kind === "girl" || a.kind === "seller")) {
       a.tx = player.x + (a.kind === "steve" ? 1.5 : -1.5);
       a.tz = player.z + 1.5;
     } else if (a.follow) {
@@ -871,7 +1010,7 @@ function updateAnimals(dt, time) {
 
     if (dist < 0.5) {
       if (!a.follow && a.kind !== "dog") {
-        const isPerson = a.kind === "steve" || a.kind === "girl";
+        const isPerson = a.kind === "steve" || a.kind === "girl" || a.kind === "seller";
         const radius = isPerson ? 3 : 8;
         const cx = isPerson ? a.homeX : g.position.x;
         const cz = isPerson ? a.homeZ : g.position.z;
@@ -896,7 +1035,7 @@ function updateAnimals(dt, time) {
 
     // машут рукой: по тапу и когда игрок рядом
     const nearPlayer = Math.hypot(player.x - g.position.x, player.z - g.position.z) < 5;
-    if (a.kind === "steve" || a.kind === "girl") {
+    if (a.kind === "steve" || a.kind === "girl" || a.kind === "seller") {
       a.greetIn -= dt;
       if (nearPlayer && a.greetIn <= 0 && a.wave <= 0) {
         a.wave = 1.1;
@@ -1062,6 +1201,71 @@ function updateParticles(dt) {
     dirty = true;
   }
   if (dirty) particles.instanceMatrix.needsUpdate = true;
+}
+
+
+// ------------------------------------------------------------------ дождь
+
+const RAIN_COUNT = 420;
+const rainPositions = new Float32Array(RAIN_COUNT * 3);
+const rainSpeed = new Float32Array(RAIN_COUNT);
+
+for (let i = 0; i < RAIN_COUNT; i++) {
+  rainPositions[i * 3] = (Math.random() - 0.5) * 40;
+  rainPositions[i * 3 + 1] = Math.random() * 22;
+  rainPositions[i * 3 + 2] = (Math.random() - 0.5) * 40;
+  rainSpeed[i] = 14 + Math.random() * 8;
+}
+
+const rainGeo = new THREE.BufferGeometry();
+rainGeo.setAttribute("position", new THREE.BufferAttribute(rainPositions, 3));
+
+const rain = new THREE.Points(
+  rainGeo,
+  new THREE.PointsMaterial({
+    color: 0xbcdcff,
+    size: 0.3,
+    transparent: true,
+    opacity: 0.85,
+    depthWrite: false,
+    fog: false,
+  }),
+);
+rain.frustumCulled = false;
+rain.visible = false;
+scene.add(rain);
+
+const weather = { raining: false, until: 25, rainFactor: 0 };
+
+function updateWeather(dt) {
+  weather.until -= dt;
+
+  if (weather.until <= 0) {
+    weather.raining = !weather.raining;
+    weather.until = weather.raining ? 25 + Math.random() * 15 : 60 + Math.random() * 40;
+    rain.visible = weather.raining;
+  }
+
+  window.__dbg = Object.assign(window.__dbg || {}, { rain: weather.raining });
+
+  const target = weather.raining ? 1 : 0;
+  weather.rainFactor += (target - weather.rainFactor) * Math.min(1, dt * 0.8);
+
+  if (!weather.raining && weather.rainFactor < 0.02) {
+    rain.visible = false;
+    return;
+  }
+
+  const pos = rainGeo.attributes.position.array;
+  for (let i = 0; i < RAIN_COUNT; i++) {
+    pos[i * 3 + 1] -= rainSpeed[i] * dt;
+    if (pos[i * 3 + 1] < player.y - 6) {
+      pos[i * 3] = player.x + (Math.random() - 0.5) * 40;
+      pos[i * 3 + 1] = player.y + 16 + Math.random() * 8;
+      pos[i * 3 + 2] = player.z + (Math.random() - 0.5) * 40;
+    }
+  }
+  rainGeo.attributes.position.needsUpdate = true;
 }
 
 // ------------------------------------------------------------------ звук
@@ -1866,6 +2070,7 @@ function tick(now) {
 
   updateParticles(dt);
   updateBall(dt);
+  updateWeather(dt);
   updateAnimals(dt, now / 1000);
   updateSky(now);
 
