@@ -140,7 +140,7 @@ const world = new Map();
 
 const key = (x, y, z) => `${x},${y},${z}`;
 const inside = (x, y, z) =>
-  x >= -BOUND.x && x <= BOUND.x && z >= -BOUND.z && z <= BOUND.z && y >= 0 && y <= BOUND.y;
+  x >= -BOUND.x && x <= BOUND.x && z >= -BOUND.z && z <= BOUND.z && y >= -10 && y <= BOUND.y;
 
 function setBlock(x, y, z, type) {
   if (!inside(x, y, z)) return false;
@@ -327,6 +327,95 @@ function buildCity() {
   }
 }
 
+
+// ------------------------------------------------------------------ пещера
+
+function buildCave(level) {
+  const ex = -20;   // вход
+  const ez = -9;
+  const cx = ex;    // центр зала
+  const cz = ez - 13;
+
+  // каменная гора
+  fillArea(ex - 6, level - 10, ez - 22, ex + 6, level + 4, ez + 4, STONE);
+
+  // площадка перед входом
+  flattenArea(ex - 3, ez - 1, ex + 3, ez + 4, level);
+
+  // арка
+  for (let dx = -2; dx <= 2; dx++) setBlock(ex + dx, level + 3, ez, STONE);
+  for (let y = level + 1; y <= level + 2; y++) {
+    setBlock(ex - 2, y, ez, STONE);
+    setBlock(ex + 2, y, ez, STONE);
+  }
+
+  // фонари у входа
+  setBlock(ex - 3, level + 1, ez + 1, WOOD);
+  setBlock(ex - 3, level + 2, ez + 1, TORCH);
+  setBlock(ex + 3, level + 1, ez + 1, WOOD);
+  setBlock(ex + 3, level + 2, ez + 1, TORCH);
+
+  // дорожка от города к пещере
+  for (let x = ex + 4; x <= -15; x++) {
+    for (let dz = 0; dz <= 2; dz++) setBlock(x, level, ez + dz, STONE);
+  }
+
+  // лестница вниз
+  let y = level - 1;
+  for (let i = 0; i < 9; i++) {
+    const z = ez - i;
+    clearArea(ex - 2, y + 1, z, ex + 2, y + 3, z);
+    for (let dx = -2; dx <= 2; dx++) setBlock(ex + dx, y, z, STONE);
+    y -= 1;
+  }
+
+  // зал
+  clearArea(cx - 5, y + 1, cz - 5, cx + 5, y + 4, cz + 5);
+  fillArea(cx - 6, y, cz - 6, cx + 6, y, cz + 6, STONE);
+  fillArea(cx - 6, y + 5, cz - 6, cx + 6, y + 5, cz + 6, STONE);
+
+  for (let x = cx - 6; x <= cx + 6; x++) {
+    for (let z = cz - 6; z <= cz + 6; z++) {
+      const edge = x === cx - 6 || x === cx + 6 || z === cz - 6 || z === cz + 6;
+      if (!edge) continue;
+      for (let yy = y + 1; yy <= y + 4; yy++) setBlock(x, yy, z, STONE);
+    }
+  }
+
+  // коридор от лестницы в зал
+  for (let z = cz + 6; z <= ez - 9; z++) {
+    clearArea(cx - 2, y + 1, z, cx + 2, y + 3, z);
+  }
+
+  // факелы
+  for (const [fx, fz] of [
+    [cx - 4, cz - 5], [cx + 4, cz - 5], [cx - 4, cz + 5], [cx + 4, cz + 5],
+    [cx - 5, cz - 2], [cx - 5, cz + 2], [cx + 5, cz - 2], [cx + 5, cz + 2],
+  ]) {
+    setBlock(fx, y + 2, fz, TORCH);
+  }
+
+  // сокровище
+  for (let dx = -2; dx <= 2; dx++) {
+    for (let dz = -2; dz <= 2; dz++) {
+      if (Math.abs(dx) + Math.abs(dz) > 2) continue;
+      setBlock(cx + dx, y + 1, cz - 4 + dz, BRICK);
+    }
+  }
+  setBlock(cx, y + 2, cz - 4, SAND);
+  setBlock(cx, y + 2, cz - 5, TORCH);
+  setBlock(cx - 3, y + 2, cz - 4, TORCH);
+  setBlock(cx + 3, y + 2, cz - 4, TORCH);
+
+  // подземное озеро
+  for (let dx = 2; dx <= 4; dx++) {
+    for (let dz = 1; dz <= 3; dz++) {
+      delBlock(cx + dx, y, cz + dz);
+      setBlock(cx + dx, y, cz + dz, WATER);
+    }
+  }
+}
+
 function generateWorld() {
   world.clear();
 
@@ -384,6 +473,7 @@ function generateWorld() {
   }
 
   buildCity();
+  buildCave(4);
 
   // деревья
   const spots = [[20, -12], [-20, 12], [18, 18], [-22, -18], [22, 4], [-8, 20], [16, -20],
@@ -867,7 +957,7 @@ function blockGeometry(topTile, sideTile, bottomTile) {
   return geo;
 }
 
-const MAX_PER_TYPE = 6000;
+const MAX_PER_TYPE = 20000;
 const meshes = [];
 const indexByType = [];
 
@@ -909,6 +999,7 @@ function rebuild() {
   }
 
   window.__dbg = Object.assign(window.__dbg || {}, { blocks: world.size });
+  window.__probe = (x, y, z) => (world.has(key(x, y, z)) ? world.get(key(x, y, z)) : -1);
 }
 
 function arr(t) { return indexByType[t]; }
